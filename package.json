@@ -1,0 +1,34 @@
+{
+  "name": "luma-stats",
+  "version": "0.1.0",
+  "description": "Dashboard for Luma event registrations with LLM-powered candidate triage and scoring",
+  "author": "João Lisboa",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "process": "npx tsx scripts/process.ts",
+    "reprocess": "npx tsx scripts/process.ts --rebuild"
+  },
+  "dependencies": {
+    "next": "16.1.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "recharts": "^3.8.0",
+    "zod": "^3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "tailwindcss": "^4",
+    "tsx": "^4",
+    "typescript": "^5"
+  }
+}
