@@ -269,23 +269,23 @@ export function CandidateTable({
       </p>
 
       {/* Table — Name, Role, Company, then category badges */}
-      <div className="bg-white rounded-xl border border-stone-100 shadow-sm overflow-visible">
+      <div className="bg-white rounded-xl border border-stone-100 shadow-sm overflow-x-auto overflow-y-visible">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-stone-100 bg-stone-50">
               <th className="text-left px-4 py-3 font-medium text-stone-500 w-[180px]">
                 Name
               </th>
-              <th className="text-left px-4 py-3 font-medium text-stone-500">
+              <th className="text-left px-4 py-3 font-medium text-stone-500 w-[200px]">
                 Role
               </th>
-              <th className="text-left px-4 py-3 font-medium text-stone-500">
+              <th className="text-left px-4 py-3 font-medium text-stone-500 w-[200px]">
                 Company
               </th>
-              {filterableFields.slice(0, 3).map((f) => (
+              {filterableFields.map((f) => (
                 <th
                   key={f.key}
-                  className="text-left px-4 py-3 font-medium text-stone-500"
+                  className="text-left px-4 py-3 font-medium text-stone-500 whitespace-nowrap"
                 >
                   {f.label}
                 </th>
@@ -295,7 +295,7 @@ export function CandidateTable({
           <tbody>
             {filtered.map((c) => {
               const roleRaw = findRaw(c, /role/i);
-              const companyRaw = findRaw(c, /work|company|empres|study|estud/i);
+              const companyRaw = findRaw(c, /organization|work|company|empres|study|estud/i);
 
               return (
                 <tr
@@ -317,12 +317,22 @@ export function CandidateTable({
                     )}
                   </td>
                   <td className="px-4 py-2.5 text-stone-600 text-xs">
-                    {roleRaw || "\u2014"}
+                    <div
+                      className="max-w-[200px] truncate"
+                      title={roleRaw || undefined}
+                    >
+                      {roleRaw || "\u2014"}
+                    </div>
                   </td>
                   <td className="px-4 py-2.5 text-stone-600 text-xs">
-                    {companyRaw || "\u2014"}
+                    <div
+                      className="max-w-[200px] truncate"
+                      title={companyRaw || undefined}
+                    >
+                      {companyRaw || "\u2014"}
+                    </div>
                   </td>
-                  {filterableFields.slice(0, 3).map((f) => {
+                  {filterableFields.map((f) => {
                     const raw = c[f.key];
                     const val = raw ? String(raw) : "";
                     const options = categoriesByField[f.key] || [];
