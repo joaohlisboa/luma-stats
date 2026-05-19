@@ -7,8 +7,10 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 
 const STANDARD_LUMA_COLUMNS = new Set([
-  "api_id", "name", "first_name", "last_name", "email", "phone_number",
-  "created_at", "approval_status", "checked_in_at", "custom_source",
+  // Luma renamed api_id → guest_id; keep both for backward compatibility
+  "api_id", "guest_id",
+  "name", "first_name", "last_name", "email", "phone_number",
+  "created_at", "approval_status", "checked_in_at", "custom_source", "utm_source",
   "qr_code_url", "amount", "amount_tax", "amount_discount", "currency",
   "coupon_code", "eth_address", "solana_address", "survey_response_rating",
   "survey_response_feedback", "ticket_type_id", "ticket_name",
@@ -19,7 +21,7 @@ const SKIP_COLUMNS = new Set([
   "qr_code_url", "amount", "amount_tax", "amount_discount", "currency",
   "coupon_code", "eth_address", "solana_address", "survey_response_rating",
   "survey_response_feedback", "ticket_type_id", "ticket_name",
-  "custom_source", "phone_number", "checked_in_at",
+  "custom_source", "utm_source", "phone_number", "checked_in_at",
 ]);
 
 export interface ParsedCSV {

@@ -118,7 +118,7 @@ async function main() {
   // ── Build candidate objects ──
   console.log("\nStep 4: Building candidate objects...");
   const candidates: Candidate[] = parsed.rows.map((row) => {
-    const id = row["api_id"] || "";
+    const id = row["guest_id"] || row["api_id"] || "";
     const c: Candidate = {
       id,
       name: row["name"] || "",
