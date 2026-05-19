@@ -40,7 +40,7 @@ Open http://localhost:3000 to see your dashboard.
 
 - Detects standard Luma columns vs custom form questions
 - Classifies qualitative fields (roles, industries, interests) into meaningful categories
-- Infers synthetic dimensions on top of the raw fields: **gender** (from first name), **technicality** (Technical / Non-technical / Mixed-Unclear from role + workplace), **industry** (broad sector from workplace), and **function** (SWE, Data/AI, PM, Design, Founder, Business, Research, Student from role)
+- Infers synthetic dimensions on top of the raw fields: **gender** (from first name), **technicality** (Technical / Non-technical / Mixed-Unclear from role + workplace), and **industry** (broad sector from workplace)
 - Computes a relevance score (0-100) for each candidate
 - Decides which charts to show and how to configure the dashboard
 - Outputs `data/processed.json` which the app reads
