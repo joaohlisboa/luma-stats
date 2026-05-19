@@ -5,7 +5,12 @@ import type { ProcessedData } from "@/lib/types";
 import { useTriage } from "@/lib/use-triage";
 import { CandidateTable } from "./CandidateTable";
 
-export function Approved({ data }: { data: ProcessedData }) {
+interface ApprovedProps {
+  data: ProcessedData;
+  onSetOverride: (candidateId: string, fieldKey: string, value: string) => void;
+}
+
+export function Approved({ data, onSetOverride }: ApprovedProps) {
   const { isHydrated, getDecision } = useTriage(data);
 
   const approved = useMemo(
@@ -32,7 +37,12 @@ export function Approved({ data }: { data: ProcessedData }) {
           No approved candidates yet. Use the Triage view to start approving.
         </div>
       ) : (
-        <CandidateTable candidates={approved} fields={data.schema.fields} />
+        <CandidateTable
+          candidates={approved}
+          fields={data.schema.fields}
+          triageDimensions={data.schema.triageDimensions}
+          onSetOverride={onSetOverride}
+        />
       )}
     </div>
   );

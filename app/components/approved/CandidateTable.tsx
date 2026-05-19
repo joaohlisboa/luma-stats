@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import type { Candidate, FieldSchema } from "@/lib/types";
+import { useState, useMemo, useEffect, useRef } from "react";
+import type { Candidate, FieldSchema, TriageDimension } from "@/lib/types";
 
 const BADGE_PALETTES = [
   "bg-indigo-100 text-indigo-700",
@@ -40,12 +40,86 @@ function findClassified(c: Candidate, fields: FieldSchema[], pattern: RegExp): s
   return "";
 }
 
+interface EditableBadgeProps {
+  value: string;
+  options: string[];
+  badgeClass: string;
+  onChange: (next: string) => void;
+}
+
+function EditableBadge({ value, options, badgeClass, onChange }: EditableBadgeProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const allOptions = useMemo(() => {
+    const set = new Set(options);
+    if (value) set.add(value);
+    return [...set].sort();
+  }, [options, value]);
+
+  return (
+    <div ref={ref} className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${badgeClass} hover:ring-2 hover:ring-stone-300 transition`}
+        title="Click to reassign"
+      >
+        {value}
+        <span className="text-[10px] opacity-60">▾</span>
+      </button>
+      {open && (
+        <div className="absolute z-10 mt-1 left-0 min-w-[160px] max-h-64 overflow-auto bg-white border border-stone-200 rounded-lg shadow-lg py-1">
+          {allOptions.map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => {
+                if (opt !== value) onChange(opt);
+                setOpen(false);
+              }}
+              className={`block w-full text-left px-3 py-1.5 text-xs hover:bg-stone-100 ${
+                opt === value ? "font-semibold text-stone-800" : "text-stone-600"
+              }`}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface CandidateTableProps {
   candidates: Candidate[];
   fields: FieldSchema[];
+  triageDimensions: TriageDimension[];
+  onSetOverride: (candidateId: string, fieldKey: string, value: string) => void;
 }
 
-export function CandidateTable({ candidates, fields }: CandidateTableProps) {
+export function CandidateTable({
+  candidates,
+  fields,
+  triageDimensions,
+  onSetOverride,
+}: CandidateTableProps) {
   const [search, setSearch] = useState("");
   const [filterField, setFilterField] = useState<string | null>(null);
   const [filterValue, setFilterValue] = useState<string | null>(null);
@@ -54,23 +128,34 @@ export function CandidateTable({ candidates, fields }: CandidateTableProps) {
     (f) => f.render === "filter" && f.source === "classified"
   );
 
-  // Build color maps for classified fields
-  const colorMaps = useMemo(() => {
-    const maps: Record<string, Record<string, string>> = {};
+  // Canonical categories per field — prefers the triage dimensions list
+  // (so reassign options stay consistent even when a bucket is empty).
+  const categoriesByField = useMemo(() => {
+    const map: Record<string, string[]> = {};
     for (const f of filterableFields) {
-      const values = new Set<string>();
+      const fromDim = triageDimensions.find((d) => d.key === f.key)?.categories;
+      const values = new Set<string>(fromDim || []);
       for (const c of candidates) {
         const v = c[f.key];
         if (v) values.add(String(v));
       }
-      const sorted = [...values].sort();
+      map[f.key] = [...values].sort();
+    }
+    return map;
+  }, [candidates, filterableFields, triageDimensions]);
+
+  // Build color maps for classified fields
+  const colorMaps = useMemo(() => {
+    const maps: Record<string, Record<string, string>> = {};
+    for (const f of filterableFields) {
+      const sorted = categoriesByField[f.key] || [];
       maps[f.key] = {};
       sorted.forEach((v, i) => {
         maps[f.key][v] = BADGE_PALETTES[i % BADGE_PALETTES.length];
       });
     }
     return maps;
-  }, [candidates, filterableFields]);
+  }, [filterableFields, categoriesByField]);
 
   const activeFieldCategories = useMemo(() => {
     if (!filterField) return [];
@@ -184,7 +269,7 @@ export function CandidateTable({ candidates, fields }: CandidateTableProps) {
       </p>
 
       {/* Table — Name, Role, Company, then category badges */}
-      <div className="bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-stone-100 shadow-sm overflow-visible">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-stone-100 bg-stone-50">
@@ -218,7 +303,18 @@ export function CandidateTable({ candidates, fields }: CandidateTableProps) {
                   className="border-b border-stone-50 hover:bg-stone-50/50"
                 >
                   <td className="px-4 py-2.5 font-medium text-stone-800">
-                    {c.name}
+                    {c.linkedinUrl ? (
+                      <a
+                        href={c.linkedinUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-700 hover:text-blue-900 hover:underline"
+                      >
+                        {c.name}
+                      </a>
+                    ) : (
+                      c.name
+                    )}
                   </td>
                   <td className="px-4 py-2.5 text-stone-600 text-xs">
                     {roleRaw || "\u2014"}
@@ -227,19 +323,19 @@ export function CandidateTable({ candidates, fields }: CandidateTableProps) {
                     {companyRaw || "\u2014"}
                   </td>
                   {filterableFields.slice(0, 3).map((f) => {
-                    const val = String(c[f.key] || "\u2014");
-                    const badge = colorMaps[f.key]?.[val];
+                    const raw = c[f.key];
+                    const val = raw ? String(raw) : "";
+                    const options = categoriesByField[f.key] || [];
+                    const badgeClass =
+                      colorMaps[f.key]?.[val] || "bg-stone-100 text-stone-500";
                     return (
                       <td key={f.key} className="px-4 py-2.5">
-                        {badge ? (
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${badge}`}
-                          >
-                            {val}
-                          </span>
-                        ) : (
-                          <span className="text-stone-600 text-xs">{val}</span>
-                        )}
+                        <EditableBadge
+                          value={val || "\u2014"}
+                          options={options}
+                          badgeClass={badgeClass}
+                          onChange={(next) => onSetOverride(c.id, f.key, next)}
+                        />
                       </td>
                     );
                   })}

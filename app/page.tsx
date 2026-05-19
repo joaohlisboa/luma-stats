@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import type { ProcessedData } from "@/lib/types";
+import { useOverrides } from "@/lib/use-overrides";
 import { EmptyState } from "./components/EmptyState";
 import { ViewToggle, type View } from "./components/ViewToggle";
 import { Dashboard } from "./components/dashboard/Dashboard";
@@ -16,7 +17,7 @@ function getHashView(): View {
 }
 
 export default function StatsPage() {
-  const [data, setData] = useState<ProcessedData | null | undefined>(undefined);
+  const [rawData, setRawData] = useState<ProcessedData | null | undefined>(undefined);
   const [view, setView] = useState<View>("dashboard");
 
   // Load data
@@ -24,11 +25,23 @@ export default function StatsPage() {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const d = require("../data/processed.json") as ProcessedData;
-      setData(d);
+      setRawData(d);
     } catch {
-      setData(null);
+      setRawData(null);
     }
   }, []);
+
+  // Apply category overrides (persisted locally) to every consumer below.
+  const fallback = useMemo<ProcessedData>(
+    () => (rawData ?? { candidates: [], meta: { eventName: "", eventDate: "", processedAt: "", candidateCount: 0, lumaColumns: [], customColumns: [] }, schema: { dashboard: [], triageDimensions: [], fields: [], scoreFactors: [] } }) as ProcessedData,
+    [rawData]
+  );
+  const { candidates: overriddenCandidates, setOverride } = useOverrides(fallback);
+  const data = useMemo<ProcessedData | null | undefined>(() => {
+    if (rawData === undefined) return undefined;
+    if (rawData === null) return null;
+    return { ...rawData, candidates: overriddenCandidates };
+  }, [rawData, overriddenCandidates]);
 
   // Hash-based routing
   useEffect(() => {
@@ -101,7 +114,7 @@ export default function StatsPage() {
       <main className="max-w-6xl mx-auto px-6 py-8">
         {view === "dashboard" && <Dashboard data={data} />}
         {view === "triage" && <Triage data={data} />}
-        {view === "approved" && <Approved data={data} />}
+        {view === "approved" && <Approved data={data} onSetOverride={setOverride} />}
       </main>
 
       {/* Footer */}
