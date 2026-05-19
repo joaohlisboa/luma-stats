@@ -45,6 +45,37 @@ export const SYNTHETIC_FIELDS: CategoryDesign = {
     fieldKey: "technicality",
     label: "Technical background",
   },
+  __synthetic_industry: {
+    categories: [
+      "Finance & Banking",
+      "Tech / Software",
+      "Consulting & Professional Services",
+      "Healthcare & Life Sciences",
+      "Education & Research",
+      "Public Sector & Nonprofit",
+      "Energy & Industrial",
+      "Consumer, Retail & Media",
+      "Student / Independent",
+      "Other",
+    ],
+    fieldKey: "industry",
+    label: "Industry",
+  },
+  __synthetic_function: {
+    categories: [
+      "Software Engineering",
+      "Data / AI / ML",
+      "Product Management",
+      "Design / UX",
+      "Founder / Executive",
+      "Business / Sales / Marketing / Ops",
+      "Research / Academia",
+      "Student",
+      "Other",
+    ],
+    fieldKey: "function",
+    label: "Function",
+  },
 };
 
 /** Returns true if a category-design entry is a synthetic field. */
@@ -259,6 +290,30 @@ Mixed / Unclear — use SPARINGLY, only when:
 - Multiple roles given that span both worlds and neither is primary
 
 Do NOT use Mixed / Unclear as a hedge for PMs / designers / founders / consultants whose role is clear. Role decides; interests do not flip it.
+
+For "industry": infer from the workplace/company name (and role if the company is ambiguous). Use broad sector buckets — a fintech is "Finance & Banking", a SaaS startup is "Tech / Software", a hospital or biotech is "Healthcare & Life Sciences". Examples:
+- "Finance & Banking": banks, fintechs, asset managers, brokers, insurers, hedge funds, crypto exchanges (Itaú, Nubank, XP, BTG, Stone, PagBank).
+- "Tech / Software": software companies, SaaS, AI labs, dev tools, big tech (Google, Meta, Anthropic, Vercel, MercadoLivre, iFood, Loft).
+- "Consulting & Professional Services": consultancies, law firms, accounting, agencies (McKinsey, BCG, Bain, Accenture, Deloitte, EY).
+- "Healthcare & Life Sciences": hospitals, pharma, biotech, health-tech.
+- "Education & Research": universities, schools, research institutes (USP, FGV, PUC, MIT, IMPA).
+- "Public Sector & Nonprofit": government, NGOs, foundations, public agencies.
+- "Energy & Industrial": oil & gas, mining, utilities, manufacturing, heavy industry, agribusiness (Petrobras, Vale, Embraer, JBS).
+- "Consumer, Retail & Media": retail, e-commerce, CPG, media, entertainment, hospitality (Magazine Luiza, Globo, Ambev).
+- "Student / Independent": currently a student, freelancer/self-employed with no clear company, between jobs.
+- "Other": doesn't fit any bucket, or workplace is unrecognizable/empty. Use sparingly.
+
+For "function": group the reported role into a job function. Look at the role field primarily; use workplace/interests as a tiebreaker. Examples:
+- "Software Engineering": developer, engineer, SWE, backend/frontend/full-stack, DevOps, SRE, mobile, embedded.
+- "Data / AI / ML": data scientist, ML engineer, AI engineer, data analyst, data engineer, research scientist focused on AI.
+- "Product Management": PM, product owner, product lead, head of product.
+- "Design / UX": designer, UX, UI, product designer, design lead, researcher (UXR).
+- "Founder / Executive": founder, co-founder, CEO, CTO, CPO, COO, partner, director, VP (when clearly leadership, not IC).
+- "Business / Sales / Marketing / Ops": sales, marketing, BD, operations, finance, HR, legal, consultant, account manager.
+- "Research / Academia": professor, researcher, PhD candidate, postdoc (non-AI focused or general academic).
+- "Student": currently studying, no professional role yet.
+- "Other": role is empty, generic ("entrepreneur" with no clarity), or doesn't fit any bucket.
+Prefer "Founder / Executive" over "Software Engineering" when someone is clearly the boss, even if they still code.
 
 Categories:
 ${categoryRef}

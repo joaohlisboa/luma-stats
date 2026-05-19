@@ -20,6 +20,18 @@ import { buildProcessedData } from "./build";
 import { processedDataSchema } from "../lib/schema";
 import type { Candidate } from "../lib/types";
 
+/**
+ * Detect synthetic fields that exist in code but not in a loaded cache.
+ * When SYNTHETIC_FIELDS gains a new entry (e.g. industry, function), every
+ * cached candidate is missing that classification — `remapInvalidClassifications`
+ * would silently fill it with "Other". This catches that case so the caller
+ * can force a full re-classify instead.
+ */
+function findMissingSyntheticFieldKeys(cachedDesign: CategoryDesign): string[] {
+  const cachedKeys = new Set(Object.keys(cachedDesign));
+  return Object.keys(SYNTHETIC_FIELDS).filter((k) => !cachedKeys.has(k));
+}
+
 const DATA_DIR = resolve(__dirname, "../data");
 const CSV_PATH = resolve(DATA_DIR, "list.csv");
 const OUTPUT_PATH = resolve(DATA_DIR, "processed.json");
@@ -92,7 +104,19 @@ async function main() {
   const classifications: Map<string, Record<string, string>> = new Map();
   const responseQualities: Map<string, number> = new Map();
 
-  if (isRebuild && existsSync(CACHE_PATH)) {
+  const cachedDesignMissingFields: string[] = (isRebuild || isUpdate) && existsSync(CACHE_PATH)
+    ? findMissingSyntheticFieldKeys(
+        (JSON.parse(readFileSync(CACHE_PATH, "utf-8")) as LLMCache).categoryDesign,
+      )
+    : [];
+  const cacheStale = cachedDesignMissingFields.length > 0;
+  if (cacheStale) {
+    console.warn(
+      `  Cache is missing new synthetic field(s): ${cachedDesignMissingFields.join(", ")} — falling back to full classification.`,
+    );
+  }
+
+  if (isRebuild && existsSync(CACHE_PATH) && !cacheStale) {
     // --rebuild mode: reuse cached LLM results
     console.log("\nSteps 2-3: Using cached LLM results (--rebuild mode)...");
     const cache: LLMCache = JSON.parse(readFileSync(CACHE_PATH, "utf-8"));
@@ -106,7 +130,7 @@ async function main() {
       }
     }
     console.log(`  ${Object.keys(categoryDesign).length} fields, ${classifications.size} cached classifications`);
-  } else if (isUpdate && existsSync(CACHE_PATH)) {
+  } else if (isUpdate && existsSync(CACHE_PATH) && !cacheStale) {
     // --update mode: reuse cached categoryDesign + classifications,
     // classify only ids that aren't in the cache yet.
     console.log("\nSteps 2-3: --update mode — loading cache, classifying new candidates only...");
@@ -158,8 +182,9 @@ async function main() {
     // Step 2: Design categories (1 small LLM call)
     console.log("\nStep 2: Designing categories (LLM)...");
     categoryDesign = designCategories(qualitative);
-    // Prepend synthetic fields (gender, technicality) so they appear first
-    // as triage dimensions. Categories are hardcoded, not LLM-designed.
+    // Prepend synthetic fields (gender, technicality, industry, function) so
+    // they appear first as triage dimensions. Categories are hardcoded, not
+    // LLM-designed; inference rules live in the classify prompt.
     categoryDesign = { ...SYNTHETIC_FIELDS, ...categoryDesign };
     for (const [col, design] of Object.entries(categoryDesign)) {
       console.log(`  ${col} → ${design.fieldKey}: ${design.categories.length} categories`);
