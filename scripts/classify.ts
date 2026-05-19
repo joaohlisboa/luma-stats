@@ -28,6 +28,40 @@ export interface ClassifiedCandidate {
   responseQuality: number;
 }
 
+/**
+ * Synthetic fields derived from multiple inputs rather than one CSV column.
+ * Keys are sentinel column names (prefixed `__synthetic_`) so they don't collide
+ * with real CSV columns; the rest of the pipeline reads them like normal entries
+ * in CategoryDesign.
+ */
+export const SYNTHETIC_FIELDS: CategoryDesign = {
+  __synthetic_gender: {
+    categories: ["Male", "Female", "Unknown"],
+    fieldKey: "gender",
+    label: "Gender",
+  },
+  __synthetic_technicality: {
+    categories: ["Technical", "Non-technical", "Mixed / Unclear"],
+    fieldKey: "technicality",
+    label: "Technical background",
+  },
+};
+
+/** Returns true if a category-design entry is a synthetic field. */
+export function isSyntheticKey(col: string): boolean {
+  return col.startsWith("__synthetic_");
+}
+
+/**
+ * Pick custom columns that hint at someone's technical background — used as
+ * extra context for the synthetic `technicality` classification (the existing
+ * qualitative columns already cover role/work/interests).
+ */
+export function pickTechnicalContextColumns(customColumns: string[]): string[] {
+  const patterns = [/experience/i, /level/i, /problem/i, /plan/i, /employees/i];
+  return customColumns.filter((c) => patterns.some((re) => re.test(c)));
+}
+
 // Both design and classification use opus for quality
 const DESIGN_MODEL = "opus";
 const CLASSIFY_MODEL = "opus";
@@ -144,40 +178,47 @@ export async function classifyCandidates(
   rows: Record<string, string>[],
   qualitativeColumns: { column: string; sampleValues: string[] }[],
   categoryDesign: CategoryDesign,
+  contextColumns: string[] = [],
   batchSize: number = 50
 ): Promise<ClassifiedCandidate[]> {
-  if (qualitativeColumns.length === 0) return [];
+  // Output field set: all entries in categoryDesign (includes synthetic ones).
+  const outputEntries = Object.entries(categoryDesign);
+  if (outputEntries.length === 0) return [];
 
   const batches: Record<string, string>[][] = [];
   for (let i = 0; i < rows.length; i += batchSize) {
     batches.push(rows.slice(i, i + batchSize));
   }
 
-  const fieldKeys = qualitativeColumns
-    .map((q) => categoryDesign[q.column]?.fieldKey)
-    .filter(Boolean) as string[];
+  const fieldKeys = outputEntries.map(([, d]) => d.fieldKey);
 
-  const categoryRef = qualitativeColumns
-    .map((q) => {
-      const design = categoryDesign[q.column];
-      if (!design) return null;
-      return `${design.fieldKey}: ${design.categories.join(" | ")}`;
-    })
-    .filter(Boolean)
+  const categoryRef = outputEntries
+    .map(([, design]) => `${design.fieldKey}: ${design.categories.join(" | ")}`)
     .join("\n");
 
   const CONCURRENCY = 10;
   console.log(`  Classifying ${rows.length} candidates in ${batches.length} batch(es), ${CONCURRENCY} parallel...`);
 
+  const cleanCell = (v: string) =>
+    (v || "—").replace(/\|/g, "/").replace(/\n/g, " ").slice(0, 200);
+
   // Build all prompts
   const batchPrompts = batches.map((batch, i) => {
-    const header = `id | ${qualitativeColumns.map((q) => categoryDesign[q.column]?.fieldKey || q.column).join(" | ")}`;
+    const inputHeaders = [
+      "firstName",
+      ...qualitativeColumns.map((q) => categoryDesign[q.column]?.fieldKey || q.column),
+      ...contextColumns,
+    ];
+    const header = `id | ${inputHeaders.join(" | ")}`;
+
     const candidateLines = batch.map((row) => {
-      const id = row["api_id"] || "";
-      const fields = qualitativeColumns
-        .map((q) => (row[q.column] || "—").replace(/\|/g, "/").replace(/\n/g, " ").slice(0, 200))
-        .join(" | ");
-      return `${id} | ${fields}`;
+      const id = row["guest_id"] || row["api_id"] || "";
+      const cells: string[] = [
+        cleanCell(row["first_name"] || row["name"] || ""),
+        ...qualitativeColumns.map((q) => cleanCell(row[q.column] || "")),
+        ...contextColumns.map((c) => cleanCell(row[c] || "")),
+      ];
+      return `${id} | ${cells.join(" | ")}`;
     });
 
     return {
@@ -193,6 +234,14 @@ For responseQuality (1-5), evaluate:
 - 1: Empty, irrelevant, spam, or purely selfish motivation (e.g., only wants to sell/recruit)
 
 Judge the QUALITY of what they wrote, not the length. A short but specific answer ("I want to learn how to use Claude for code review in my team") scores higher than a long generic one.
+
+For "gender": infer from firstName using common naming conventions across cultures (most cultures have strong gender associations for common first names — apply whichever convention fits the name, e.g. Portuguese -a/-o endings, Slavic -ova suffixes, etc.). Use "Unknown" for genuinely unisex names, initials, or empty values. When uncertain, prefer "Unknown" over guessing.
+
+For "technicality": consider ALL inputs together — role, work/study context, experience level, interests, problem they care about, etc.
+- "Technical": software engineers, data/AI specialists, students of CS/engineering/exact-sciences, researchers in technical fields, anyone who codes regularly.
+- "Non-technical": pure business/finance/legal/marketing/design roles with no coding signal, students of humanities/social sciences, executives whose listed interests are strategy/management without dev tooling.
+- "Mixed / Unclear": product managers, consultants, founders who clearly mix tech with business, or cases where signals genuinely conflict.
+Weigh role + interests heavily; do NOT decide based on Claude experience level alone (a non-technical exec can be a daily user).
 
 Categories:
 ${categoryRef}

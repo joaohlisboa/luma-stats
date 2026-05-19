@@ -8,7 +8,13 @@
 import { existsSync, writeFileSync, readFileSync } from "fs";
 import { resolve } from "path";
 import { parseCSV, detectQualitativeColumns } from "./parse";
-import { designCategories, classifyCandidates, type CategoryDesign } from "./classify";
+import {
+  designCategories,
+  classifyCandidates,
+  pickTechnicalContextColumns,
+  SYNTHETIC_FIELDS,
+  type CategoryDesign,
+} from "./classify";
 import { computeScores } from "./score";
 import { buildProcessedData } from "./build";
 import { processedDataSchema } from "../lib/schema";
@@ -74,27 +80,44 @@ async function main() {
     // Step 2: Design categories (1 small LLM call)
     console.log("\nStep 2: Designing categories (LLM)...");
     categoryDesign = designCategories(qualitative);
+    // Prepend synthetic fields (gender, technicality) so they appear first
+    // as triage dimensions. Categories are hardcoded, not LLM-designed.
+    categoryDesign = { ...SYNTHETIC_FIELDS, ...categoryDesign };
     for (const [col, design] of Object.entries(categoryDesign)) {
       console.log(`  ${col} → ${design.fieldKey}: ${design.categories.length} categories`);
     }
 
     // Step 3: Classify candidates (batched LLM calls)
     console.log("\nStep 3: Classifying candidates (LLM)...");
-    const results = await classifyCandidates(parsed.rows, qualitative, categoryDesign);
+    const contextColumns = pickTechnicalContextColumns(parsed.customColumns);
+    if (contextColumns.length > 0) {
+      console.log(`  Extra context for technicality: ${contextColumns.join(", ")}`);
+    }
+    const results = await classifyCandidates(
+      parsed.rows,
+      qualitative,
+      categoryDesign,
+      contextColumns,
+    );
     for (const r of results) {
       classifications.set(r.id, r.classifications);
       responseQualities.set(r.id, r.responseQuality);
     }
     console.log(`  Classified ${classifications.size}/${parsed.rows.length} candidates`);
 
-    // Validate: remap any classification not in the designed category set to "Other"
+    // Validate: remap any classification not in the designed category set
+    // to the last category (catch-all by convention: "Other"/"Unknown"/"Mixed").
     let remapped = 0;
-    for (const [id, cls] of classifications) {
-      for (const [col, design] of Object.entries(categoryDesign)) {
+    for (const [, cls] of classifications) {
+      for (const [, design] of Object.entries(categoryDesign)) {
         const fieldKey = design.fieldKey;
         const value = cls[fieldKey];
+        const fallback = design.categories[design.categories.length - 1] || "Other";
         if (value && !design.categories.includes(value)) {
-          cls[fieldKey] = "Other";
+          cls[fieldKey] = fallback;
+          remapped++;
+        } else if (!value) {
+          cls[fieldKey] = fallback;
           remapped++;
         }
       }
