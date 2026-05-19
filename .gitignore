@@ -5,12 +5,16 @@ node_modules/
 .next/
 out/
 
-# data files — raw CSV always gitignored, processed.json gitignored in template
-# ambassadors: remove the processed.json line below to commit it for Vercel deploy
+# data files — raw CSV always gitignored, the rest is gitignored in template
+# ambassadors: remove processed.json / overrides.json / triage.json from this
+# list to commit them for a Vercel deploy.
 data/list.csv
 data/processed.json
 data/processed-debug.json
 data/llm-cache.json
+data/overrides.json
+data/triage.json
+data/*.tmp
 
 # misc
 .DS_Store

@@ -1,51 +1,103 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type { Candidate, ProcessedData } from "./types";
 
 type Decision = "approved" | "declined";
+type Decisions = Record<string, Decision>;
 
-function storageKey(meta: ProcessedData["meta"]): string {
-  // Simple hash from event name + date for scoping
-  const raw = `${meta.eventName}|${meta.eventDate}`;
-  let hash = 0;
-  for (let i = 0; i < raw.length; i++) {
-    hash = ((hash << 5) - hash + raw.charCodeAt(i)) | 0;
+const API = "/api/triage";
+const LEGACY_PREFIX = "triage-";
+const DEBOUNCE_MS = 300;
+
+/**
+ * Merge all legacy `triage-{hash}` localStorage entries. Used once on first
+ * load when the server file is empty, to migrate existing in-browser decisions.
+ */
+function readLegacyLocalStorage(): Decisions | null {
+  try {
+    const merged: Decisions = {};
+    let found = false;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(LEGACY_PREFIX)) continue;
+      const raw = localStorage.getItem(k);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as Decisions;
+      Object.assign(merged, parsed);
+      found = true;
+    }
+    return found ? merged : null;
+  } catch {
+    return null;
   }
-  return `triage-${Math.abs(hash).toString(36)}`;
 }
 
 export function useTriage(data: ProcessedData) {
-  const key = storageKey(data.meta);
-  const [decisions, setDecisions] = useState<Record<string, Decision>>({});
+  const [decisions, setDecisions] = useState<Decisions>({});
   const [isHydrated, setIsHydrated] = useState(false);
+  const dirty = useRef(false);
 
-  // Load from localStorage
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(key);
-      if (stored) setDecisions(JSON.parse(stored));
-    } catch {
-      // ignore
-    }
-    setIsHydrated(true);
-  }, [key]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(API);
+        const server = res.ok ? ((await res.json()) as Decisions) : {};
 
-  // Persist to localStorage
+        if (Object.keys(server).length === 0) {
+          const legacy = readLegacyLocalStorage();
+          if (legacy && Object.keys(legacy).length > 0) {
+            await fetch(API, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(legacy),
+            });
+            if (!cancelled) {
+              setDecisions(legacy);
+              console.info(
+                `[triage] migrated ${Object.keys(legacy).length} decisions from localStorage to data/triage.json`,
+              );
+            }
+          }
+        } else if (!cancelled) {
+          setDecisions(server);
+        }
+      } catch (err) {
+        console.warn("[triage] failed to load from server", err);
+      } finally {
+        if (!cancelled) setIsHydrated(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
-    if (isHydrated) {
-      localStorage.setItem(key, JSON.stringify(decisions));
-    }
-  }, [decisions, isHydrated, key]);
+    if (!isHydrated || !dirty.current) return;
+    const t = setTimeout(() => {
+      fetch(API, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(decisions),
+      }).catch((err) => {
+        console.warn("[triage] save failed", err);
+      });
+    }, DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [decisions, isHydrated]);
 
   const getDecision = useCallback(
     (c: Candidate): string => decisions[c.id] || c.approvalStatus,
-    [decisions]
+    [decisions],
   );
 
   const setDecision = useCallback((id: string, d: Decision) => {
+    dirty.current = true;
     setDecisions((prev) => ({ ...prev, [id]: d }));
   }, []);
 
   const clearDecision = useCallback((id: string) => {
+    dirty.current = true;
     setDecisions((prev) => {
       const next = { ...prev };
       delete next[id];
@@ -54,6 +106,7 @@ export function useTriage(data: ProcessedData) {
   }, []);
 
   const bulkApprove = useCallback((ids: string[]) => {
+    dirty.current = true;
     setDecisions((prev) => {
       const next = { ...prev };
       for (const id of ids) next[id] = "approved";
@@ -62,6 +115,7 @@ export function useTriage(data: ProcessedData) {
   }, []);
 
   const bulkDecline = useCallback((ids: string[]) => {
+    dirty.current = true;
     setDecisions((prev) => {
       const next = { ...prev };
       for (const id of ids) next[id] = "declined";
@@ -70,6 +124,7 @@ export function useTriage(data: ProcessedData) {
   }, []);
 
   const resetAll = useCallback(() => {
+    dirty.current = true;
     setDecisions({});
   }, []);
 

@@ -60,15 +60,17 @@ When you get new registrations:
 
 Use `pnpm process` instead if you want to re-design categories from scratch (e.g. the form questions changed). Use `pnpm reprocess` to rebuild outputs from the cache without any LLM calls.
 
-Your triage decisions and category overrides are stored in the browser (localStorage) and are linked to candidate IDs, so they survive any re-processing.
+Your triage decisions and category overrides are persisted to `data/triage.json` and `data/overrides.json` via the app's API routes, keyed by candidate ID. They survive re-processing and dev-server restarts. (Existing localStorage entries auto-migrate to disk on first load.)
 
 ## Deploying to Vercel
 
-1. Remove the `data/processed.json` line from `.gitignore`
-2. Commit `data/processed.json` to your repo
+1. Remove `data/processed.json` (and optionally `data/overrides.json`, `data/triage.json`) from `.gitignore`
+2. Commit those files to your repo
 3. Connect to Vercel and deploy
 
 **Never commit `data/list.csv`** — it contains raw emails and personal data.
+
+Note: Vercel's filesystem is read-only at runtime, so triage / override edits made on the deployed site won't persist. Do your curation locally; deploy as a read-only snapshot.
 
 ## Security & PII
 

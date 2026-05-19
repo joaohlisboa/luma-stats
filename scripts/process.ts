@@ -5,7 +5,7 @@
  * Everything else is deterministic scripts.
  */
 
-import { existsSync, writeFileSync, readFileSync } from "fs";
+import { existsSync, writeFileSync, readFileSync, unlinkSync } from "fs";
 import { resolve } from "path";
 import { parseCSV, detectQualitativeColumns } from "./parse";
 import {
@@ -24,6 +24,7 @@ const DATA_DIR = resolve(__dirname, "../data");
 const CSV_PATH = resolve(DATA_DIR, "list.csv");
 const OUTPUT_PATH = resolve(DATA_DIR, "processed.json");
 const CACHE_PATH = resolve(DATA_DIR, "llm-cache.json");
+const TRIAGE_PATH = resolve(DATA_DIR, "triage.json");
 
 const isRebuild = process.argv.includes("--rebuild");
 const isUpdate = process.argv.includes("--update");
@@ -305,6 +306,19 @@ async function main() {
 
   // ── Write output ──
   writeFileSync(OUTPUT_PATH, JSON.stringify(result.data, null, 2));
+
+  // ── Reset triage decisions ──
+  // A fresh CSV import means Luma's approval_status is the new source of
+  // truth. The user's local approve/decline decisions from before this
+  // import are stale — wipe them. Category overrides (data/overrides.json)
+  // are preserved because LLM classifications didn't change for cached ids.
+  // Skip in --rebuild mode (that path is for regenerating outputs from cache,
+  // not for ingesting a fresh export).
+  if (!isRebuild && existsSync(TRIAGE_PATH)) {
+    unlinkSync(TRIAGE_PATH);
+    console.log(`\n  Reset data/triage.json — Luma's approval_status is now the source of truth.`);
+    console.log(`  If the dev server is open, reload the tab so it picks up the reset.`);
+  }
 
   console.log(`\n  Done! Processed ${result.data.meta.candidateCount} candidates.`);
   console.log(`  Dashboard: ${result.data.schema.dashboard.length} charts`);
