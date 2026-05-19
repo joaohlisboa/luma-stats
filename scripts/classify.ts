@@ -61,21 +61,6 @@ export const SYNTHETIC_FIELDS: CategoryDesign = {
     fieldKey: "industry",
     label: "Industry",
   },
-  __synthetic_function: {
-    categories: [
-      "Software Engineering",
-      "Data / AI / ML",
-      "Product Management",
-      "Design / UX",
-      "Founder / Executive",
-      "Business / Sales / Marketing / Ops",
-      "Research / Academia",
-      "Student",
-      "Other",
-    ],
-    fieldKey: "function",
-    label: "Function",
-  },
 };
 
 /** Returns true if a category-design entry is a synthetic field. */
@@ -302,18 +287,6 @@ For "industry": infer from the workplace/company name (and role if the company i
 - "Consumer, Retail & Media": retail, e-commerce, CPG, media, entertainment, hospitality (Magazine Luiza, Globo, Ambev).
 - "Student / Independent": currently a student, freelancer/self-employed with no clear company, between jobs.
 - "Other": doesn't fit any bucket, or workplace is unrecognizable/empty. Use sparingly.
-
-For "function": group the reported role into a job function. Look at the role field primarily; use workplace/interests as a tiebreaker. Examples:
-- "Software Engineering": developer, engineer, SWE, backend/frontend/full-stack, DevOps, SRE, mobile, embedded.
-- "Data / AI / ML": data scientist, ML engineer, AI engineer, data analyst, data engineer, research scientist focused on AI.
-- "Product Management": PM, product owner, product lead, head of product.
-- "Design / UX": designer, UX, UI, product designer, design lead, researcher (UXR).
-- "Founder / Executive": founder, co-founder, CEO, CTO, CPO, COO, partner, director, VP (when clearly leadership, not IC).
-- "Business / Sales / Marketing / Ops": sales, marketing, BD, operations, finance, HR, legal, consultant, account manager.
-- "Research / Academia": professor, researcher, PhD candidate, postdoc (non-AI focused or general academic).
-- "Student": currently studying, no professional role yet.
-- "Other": role is empty, generic ("entrepreneur" with no clarity), or doesn't fit any bucket.
-Prefer "Founder / Executive" over "Software Engineering" when someone is clearly the boss, even if they still code.
 
 Categories:
 ${categoryRef}
