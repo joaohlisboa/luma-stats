@@ -237,11 +237,28 @@ Judge the QUALITY of what they wrote, not the length. A short but specific answe
 
 For "gender": infer from firstName using common naming conventions across cultures (most cultures have strong gender associations for common first names — apply whichever convention fits the name, e.g. Portuguese -a/-o endings, Slavic -ova suffixes, etc.). Use "Unknown" for genuinely unisex names, initials, or empty values. When uncertain, prefer "Unknown" over guessing.
 
-For "technicality": consider ALL inputs together — role, work/study context, experience level, interests, problem they care about, etc.
-- "Technical": software engineers, data/AI specialists, students of CS/engineering/exact-sciences, researchers in technical fields, anyone who codes regularly.
-- "Non-technical": pure business/finance/legal/marketing/design roles with no coding signal, students of humanities/social sciences, executives whose listed interests are strategy/management without dev tooling.
-- "Mixed / Unclear": product managers, consultants, founders who clearly mix tech with business, or cases where signals genuinely conflict.
-Weigh role + interests heavily; do NOT decide based on Claude experience level alone (a non-technical exec can be a daily user).
+For "technicality": Technical / Non-technical / Mixed / Unclear.
+
+PRIMARY SIGNAL: role + work/study. Stated interests ("agents", "MCP", "Claude Code", "skills", "vibe coding", "subagents", "harness") are common across the WHOLE audience and do NOT by themselves indicate technical background — a PM or designer interested in agents is still non-technical.
+
+Technical (commit when ANY apply):
+- Role contains (in any language): engineer, developer, programmer, CTO/CIO, tech lead, architect, SRE, DevOps, ML/AI engineer, data scientist/engineer, research scientist
+- Student of CS, computer/software/electrical engineering, mathematics, physics, or other exact sciences (read work/study, not just "Student")
+- Founder of a company whose product IS technical (coding tools, AI infra, dev platforms, SaaS where the founder builds the code)
+- Department head explicitly in technology (e.g. "Head of Tech", "Chefe de Prospecção Tecnológica", AI strategy at a tech company, Apple Developer Academy coordinator)
+
+Non-technical (commit when ANY apply, EVEN IF interests sound technical):
+- Product Manager / Owner / Lead / Director / Group PM / Head of Product / Product Specialist
+- Designer of any kind (UX, Product, UI, Visual, Design Researcher)
+- Consultant, Business Analyst, Portfolio Manager, Investor (without other technical signal), Sales, Marketing, Operations Manager, Commercial Director, Strategy, BD, Account Manager
+- C-suite of a non-tech-product company (CEO/CFO/COO of consultancies, retail, finance, healthcare, design studios, traditional businesses) — even if they personally use Claude daily
+- Students of humanities, social sciences, law, business, design, healthcare, biology (non-bioinformatics)
+
+Mixed / Unclear — use SPARINGLY, only when:
+- The role is genuinely ambiguous AND nothing else disambiguates
+- Multiple roles given that span both worlds and neither is primary
+
+Do NOT use Mixed / Unclear as a hedge for PMs / designers / founders / consultants whose role is clear. Role decides; interests do not flip it.
 
 Categories:
 ${categoryRef}
