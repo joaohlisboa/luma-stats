@@ -5,14 +5,12 @@
 
 import type {
   ProcessedData,
-  DashboardItem,
-  ChartConfig,
-  StatCardConfig,
   TriageDimension,
   FieldSchema,
   Candidate,
 } from "../lib/types";
-import type { CategoryDesign } from "./classify";
+import { buildDashboard } from "../lib/dashboard";
+import { isSyntheticKey, type CategoryDesign } from "./classify";
 import type { ScoreConfig } from "./score";
 import type { ParsedCSV } from "./parse";
 
@@ -34,32 +32,11 @@ function countBy(candidates: Candidate[], key: string): { name: string; value: n
     .map(([name, value]) => ({ name, value }));
 }
 
-function buildTimeline(candidates: Candidate[]): { name: string; value: number }[] {
-  const counts: Record<string, number> = {};
-  for (const c of candidates) {
-    if (!c.createdAt) continue;
-    const d = new Date(c.createdAt);
-    if (isNaN(d.getTime())) continue;
-    const key = `${d.getDate()}/${d.getMonth() + 1}`;
-    counts[key] = (counts[key] || 0) + 1;
-  }
-
-  // Sort chronologically
-  return Object.entries(counts)
-    .map(([name, value]) => {
-      const [day, month] = name.split("/").map(Number);
-      return { name, value, sortKey: month * 100 + day };
-    })
-    .sort((a, b) => a.sortKey - b.sortKey)
-    .map(({ name, value }) => ({ name, value }));
-}
-
 export function buildProcessedData(input: BuildInput): ProcessedData {
   const { parsed, candidates, categoryDesign, scoreConfig } = input;
 
   // ── Build field schemas ──
   const fields: FieldSchema[] = [];
-  const classifiedFieldKeys: string[] = [];
 
   // Standard Luma fields
   fields.push({ key: "name", label: "Name", source: "luma", render: "hidden" });
@@ -67,8 +44,7 @@ export function buildProcessedData(input: BuildInput): ProcessedData {
   fields.push({ key: "approvalStatus", label: "Status", source: "luma", render: "hidden" });
 
   // Classified fields from category design + their raw counterparts
-  for (const [, design] of Object.entries(categoryDesign)) {
-    classifiedFieldKeys.push(design.fieldKey);
+  for (const [col, design] of Object.entries(categoryDesign)) {
     // Classified category → filter
     fields.push({
       key: design.fieldKey,
@@ -76,6 +52,9 @@ export function buildProcessedData(input: BuildInput): ProcessedData {
       source: "classified",
       render: "filter",
     });
+    // Synthetic fields (gender, technicality) have no underlying CSV column,
+    // so no "Raw" companion.
+    if (isSyntheticKey(col)) continue;
     // Raw value → detail (shown in expanded cards and tables)
     fields.push({
       key: `${design.fieldKey}Raw`,
@@ -128,113 +107,12 @@ export function buildProcessedData(input: BuildInput): ProcessedData {
   }
 
   // ── Build dashboard items ──
-  const dashboard: DashboardItem[] = [];
-  let chartId = 0;
+  const dashboard = buildDashboard(candidates, fields);
 
-  // Stat cards
-  const statTotal: StatCardConfig = {
-    id: `chart-${chartId++}`,
-    type: "stat-card",
-    title: "Registrations",
-    value: String(candidates.length),
-  };
-  dashboard.push(statTotal);
-
-  // Find experience field for a % stat card (could be classified or fixed-choice)
-  const allFieldKeys = [...classifiedFieldKeys, ...fields.map((f) => f.key)];
-  const expField = allFieldKeys.find((k) =>
-    k.toLowerCase().includes("experience") || k.toLowerCase().includes("nivel")
-  );
-  if (expField) {
-    const expData = countBy(candidates, expField);
-    const daily = expData.find((d) =>
-      d.name.toLowerCase().includes("daily") || d.name.toLowerCase().includes("diári")
-    );
-    if (daily) {
-      const pct = Math.round((daily.value / candidates.length) * 100);
-      dashboard.push({
-        id: `chart-${chartId++}`,
-        type: "stat-card",
-        title: "Daily users",
-        value: `${pct}%`,
-        subtitle: `${daily.value} candidates`,
-      } as StatCardConfig);
-    }
-  }
-
-  // Find a boolean "wants to present" type field
-  for (const f of fields) {
-    if (f.render === "filter" && f.source === "custom") {
-      const vals = countBy(candidates, f.key);
-      const yesVal = vals.find((v) =>
-        v.name.toLowerCase() === "yes" || v.name.toLowerCase() === "sim"
-      );
-      if (yesVal && vals.length <= 3) {
-        // Shorten label for stat card
-        let label = f.label;
-        if (label.length > 30) {
-          if (label.toLowerCase().includes("present")) label = "Want to present";
-          else label = label.slice(0, 27) + "...";
-        }
-        dashboard.push({
-          id: `chart-${chartId++}`,
-          type: "stat-card",
-          title: label,
-          value: String(yesVal.value),
-          subtitle: `said yes`,
-        } as StatCardConfig);
-        break;
-      }
-    }
-  }
-
-  // Timeline chart
-  const timeline = buildTimeline(candidates);
-  if (timeline.length > 1) {
-    dashboard.push({
-      id: `chart-${chartId++}`,
-      type: "area-timeline",
-      title: "Registrations over time",
-      data: timeline,
-    } as ChartConfig);
-  }
-
-  // Charts for classified fields
-  for (const [, design] of Object.entries(categoryDesign)) {
-    const data = countBy(candidates, design.fieldKey);
-    const chartType = data.length <= 6 ? "donut" : "horizontal-bar";
-
-    dashboard.push({
-      id: `chart-${chartId++}`,
-      type: chartType,
-      title: design.label,
-      data,
-    } as ChartConfig);
-  }
-
-  // Charts for non-classified filter fields with reasonable cardinality
-  for (const f of fields) {
-    if (f.source === "custom" && f.render === "filter") {
-      // Check it's not already a classified field
-      if (classifiedFieldKeys.includes(f.key)) continue;
-
-      const data = countBy(candidates, f.key);
-      if (data.length >= 2 && data.length <= 15) {
-        const chartType = data.length <= 6 ? "donut" : "horizontal-bar";
-        dashboard.push({
-          id: `chart-${chartId++}`,
-          type: chartType,
-          title: f.label,
-          data,
-        } as ChartConfig);
-      }
-    }
-  }
-
-  // ── Build triage dimensions (top 3-4 classified fields) ──
+  // ── Build triage dimensions (all classified fields, capped at 8 for layout) ──
   const triageDimensions: TriageDimension[] = [];
   for (const [, design] of Object.entries(categoryDesign)) {
-    if (triageDimensions.length >= 4) break;
+    if (triageDimensions.length >= 8) break;
     triageDimensions.push({
       key: design.fieldKey,
       label: design.label,
@@ -243,6 +121,11 @@ export function buildProcessedData(input: BuildInput): ProcessedData {
   }
 
   // Add experience as a triage dimension if it exists and isn't already classified
+  const expField = fields
+    .map((f) => f.key)
+    .find(
+      (k) => k.toLowerCase().includes("experience") || k.toLowerCase().includes("nivel")
+    );
   if (expField && !triageDimensions.some((d) => d.key === expField)) {
     const expData = countBy(candidates, expField);
     triageDimensions.push({
