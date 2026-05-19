@@ -26,11 +26,40 @@ const OUTPUT_PATH = resolve(DATA_DIR, "processed.json");
 const CACHE_PATH = resolve(DATA_DIR, "llm-cache.json");
 
 const isRebuild = process.argv.includes("--rebuild");
+const isUpdate = process.argv.includes("--update");
 
 interface LLMCache {
   categoryDesign: CategoryDesign;
   classifications: Record<string, Record<string, string>>;
   responseQualities?: Record<string, number>;
+}
+
+/**
+ * Remap any classification that's missing or not in the designed category set
+ * to the field's catch-all (last category by convention: "Other"/"Unknown"/"Mixed").
+ */
+function remapInvalidClassifications(
+  classifications: Map<string, Record<string, string>>,
+  categoryDesign: CategoryDesign,
+): void {
+  let remapped = 0;
+  for (const [, cls] of classifications) {
+    for (const [, design] of Object.entries(categoryDesign)) {
+      const fieldKey = design.fieldKey;
+      const value = cls[fieldKey];
+      const fallback = design.categories[design.categories.length - 1] || "Other";
+      if (value && !design.categories.includes(value)) {
+        cls[fieldKey] = fallback;
+        remapped++;
+      } else if (!value) {
+        cls[fieldKey] = fallback;
+        remapped++;
+      }
+    }
+  }
+  if (remapped > 0) {
+    console.log(`  Validation: remapped ${remapped} invalid classification(s) to catch-all`);
+  }
 }
 
 async function main() {
@@ -76,7 +105,55 @@ async function main() {
       }
     }
     console.log(`  ${Object.keys(categoryDesign).length} fields, ${classifications.size} cached classifications`);
+  } else if (isUpdate && existsSync(CACHE_PATH)) {
+    // --update mode: reuse cached categoryDesign + classifications,
+    // classify only ids that aren't in the cache yet.
+    console.log("\nSteps 2-3: --update mode — loading cache, classifying new candidates only...");
+    const cache: LLMCache = JSON.parse(readFileSync(CACHE_PATH, "utf-8"));
+    categoryDesign = cache.categoryDesign;
+    for (const [id, cls] of Object.entries(cache.classifications)) {
+      classifications.set(id, cls);
+    }
+    if (cache.responseQualities) {
+      for (const [id, q] of Object.entries(cache.responseQualities)) {
+        responseQualities.set(id, q);
+      }
+    }
+
+    const newRows = parsed.rows.filter((row) => {
+      const id = row["guest_id"] || row["api_id"] || "";
+      return id && !classifications.has(id);
+    });
+    console.log(`  Cache: ${classifications.size} existing · CSV: ${parsed.rows.length} rows · new: ${newRows.length}`);
+
+    if (newRows.length > 0 && qualitative.length > 0) {
+      const contextColumns = pickTechnicalContextColumns(parsed.customColumns);
+      if (contextColumns.length > 0) {
+        console.log(`  Extra context for technicality: ${contextColumns.join(", ")}`);
+      }
+      const results = await classifyCandidates(newRows, qualitative, categoryDesign, contextColumns);
+      for (const r of results) {
+        classifications.set(r.id, r.classifications);
+        responseQualities.set(r.id, r.responseQuality);
+      }
+      console.log(`  Classified ${results.length} new candidate(s)`);
+      remapInvalidClassifications(classifications, categoryDesign);
+
+      // Persist updated cache
+      const updatedCache: LLMCache = {
+        categoryDesign,
+        classifications: Object.fromEntries(classifications),
+        responseQualities: Object.fromEntries(responseQualities),
+      };
+      writeFileSync(CACHE_PATH, JSON.stringify(updatedCache, null, 2));
+      console.log("  Cache updated.");
+    } else if (newRows.length === 0) {
+      console.log("  No new candidates — refreshing Luma fields (approval_status, check-ins) from CSV.");
+    }
   } else if (qualitative.length > 0) {
+    if (isUpdate) {
+      console.warn("  --update requested but no cache found at data/llm-cache.json — running full process.");
+    }
     // Step 2: Design categories (1 small LLM call)
     console.log("\nStep 2: Designing categories (LLM)...");
     categoryDesign = designCategories(qualitative);
@@ -105,28 +182,9 @@ async function main() {
     }
     console.log(`  Classified ${classifications.size}/${parsed.rows.length} candidates`);
 
-    // Validate: remap any classification not in the designed category set
-    // to the last category (catch-all by convention: "Other"/"Unknown"/"Mixed").
-    let remapped = 0;
-    for (const [, cls] of classifications) {
-      for (const [, design] of Object.entries(categoryDesign)) {
-        const fieldKey = design.fieldKey;
-        const value = cls[fieldKey];
-        const fallback = design.categories[design.categories.length - 1] || "Other";
-        if (value && !design.categories.includes(value)) {
-          cls[fieldKey] = fallback;
-          remapped++;
-        } else if (!value) {
-          cls[fieldKey] = fallback;
-          remapped++;
-        }
-      }
-    }
-    if (remapped > 0) {
-      console.log(`  Validation: remapped ${remapped} invalid classification(s) to "Other"`);
-    }
+    remapInvalidClassifications(classifications, categoryDesign);
 
-    // Cache LLM results for --rebuild
+    // Cache LLM results for --rebuild / --update
     const cache: LLMCache = {
       categoryDesign,
       classifications: Object.fromEntries(classifications),

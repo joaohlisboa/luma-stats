@@ -56,9 +56,11 @@ When you get new registrations:
 
 1. Re-export the full CSV from Luma
 2. Replace `data/list.csv`
-3. Run `pnpm process` again
+3. Run **`pnpm process:update`** — classifies only new candidates via LLM, reuses cached classifications for everyone else, and refreshes Luma fields (approval status, check-ins) for all rows.
 
-Your triage decisions are stored in the browser (localStorage) and are linked to candidate IDs, so they survive re-processing.
+Use `pnpm process` instead if you want to re-design categories from scratch (e.g. the form questions changed). Use `pnpm reprocess` to rebuild outputs from the cache without any LLM calls.
+
+Your triage decisions and category overrides are stored in the browser (localStorage) and are linked to candidate IDs, so they survive any re-processing.
 
 ## Deploying to Vercel
 

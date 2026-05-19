@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "process": "npx tsx scripts/process.ts",
+    "process:update": "npx tsx scripts/process.ts --update",
     "reprocess": "npx tsx scripts/process.ts --rebuild"
   },
   "dependencies": {
