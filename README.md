@@ -1,8 +1,8 @@
 # Luma Stats
 
-Dashboard for Claude ambassadors to visualize and triage Luma event registrations.
+Dashboard for Claude ambassadors to triage Luma event registrations.
 
-Drop your CSV, run one command, get a full dashboard with charts, triage tools, and an approved list.
+Drop your CSV, run one command, get charts, triage tools, an approved list, and an optional team-organization board.
 
 ![Dashboard view](docs/dashboard.png)
 
@@ -10,86 +10,76 @@ Drop your CSV, run one command, get a full dashboard with charts, triage tools, 
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) (LTS)
-- [pnpm](https://pnpm.io/)
-- [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) (for processing your CSV)
+- [Node.js](https://nodejs.org/) (LTS), [pnpm](https://pnpm.io/), [Claude CLI](https://docs.anthropic.com/en/docs/claude-code)
 
 ## Quick Start
 
 ```bash
-# 1. Clone and install
-git clone <this-repo>
-cd luma-stats
-pnpm install
-
-# 2. Export your guest list from Luma (CSV format)
-#    Place it at data/list.csv
-
-# 3. Process with Claude
-pnpm process
-
-# 4. Start the dashboard
-pnpm dev
+git clone <this-repo> && cd luma-stats && pnpm install
+# Export your Luma guest list as CSV → data/list.csv
+pnpm process    # Claude classifies and scores candidates → data/processed.json
+pnpm dev        # http://localhost:3000
 ```
-
-Open http://localhost:3000 to see your dashboard.
 
 ## How It Works
 
-`pnpm process` calls Claude CLI to analyze your CSV. Claude:
+`pnpm process` calls Claude CLI to:
 
-- Detects standard Luma columns vs custom form questions
-- Classifies qualitative fields (roles, industries, interests) into meaningful categories
-- Infers synthetic dimensions on top of the raw fields: **gender** (from first name), **technicality** (Technical / Non-technical / Mixed-Unclear from role + workplace), and **industry** (broad sector from workplace)
-- Computes a relevance score (0-100) for each candidate
-- Decides which charts to show and how to configure the dashboard
-- Outputs `data/processed.json` which the app reads
+- Detect Luma vs custom form columns
+- Classify qualitative fields (roles, industries, interests)
+- Infer synthetic dimensions: **gender** (from name), **technicality** (Technical / Non-technical / Mixed-Unclear), **industry** (sector from workplace)
+- Compute a 0–100 relevance score
+- Decide which charts to show
+- Output `data/processed.json`
 
-The app has 3 views (toggle at the top):
+## Views
 
-- **Dashboard** — Charts and stats overview
-- **Triage** — Review and approve/decline candidates with balance tracking
-- **Approved** — Filterable table of approved candidates; category badges are click-to-reassign dropdowns, and overrides persist per event
+- **Dashboard** — Charts and stats
+- **Triage** — Approve/decline with balance tracking
+- **Approved** — Filterable table; category badges are click-to-reassign dropdowns (overrides persist per event)
+- **Groups** *(opt-in)* — Team organization board; see [Groups (workshops & hackathons)](#groups-workshops--hackathons)
 
 ## Updating Data
 
-When you get new registrations:
+Re-export CSV, replace `data/list.csv`, then:
 
-1. Re-export the full CSV from Luma
-2. Replace `data/list.csv`
-3. Run **`pnpm process:update`** — classifies only new candidates via LLM, reuses cached classifications for everyone else, and refreshes Luma fields (approval status, check-ins) for all rows.
+- `pnpm process:update` — only classifies new candidates; refreshes Luma fields for the rest
+- `pnpm process` — re-design categories from scratch (form questions changed)
+- `pnpm reprocess` — rebuild from cache without any LLM calls
 
-Use `pnpm process` instead if you want to re-design categories from scratch (e.g. the form questions changed). Use `pnpm reprocess` to rebuild outputs from the cache without any LLM calls.
+Triage decisions and category overrides persist to `data/triage.json` / `data/overrides.json` via the app's API. They survive re-processing.
 
-Your triage decisions and category overrides are persisted to `data/triage.json` and `data/overrides.json` via the app's API routes, keyed by candidate ID. They survive re-processing and dev-server restarts. (Existing localStorage entries auto-migrate to disk on first load.)
+## Groups (workshops & hackathons)
+
+Optional 4th view for events that need teams. Hidden by default; enabled by running `/groups-setup` in Claude Code at the project root.
+
+The slash command interactively:
+
+1. Asks constraints — problems (e.g. Security / Healthcare), team size, min/max technical per team, optional secondary signal (e.g. Claude plan tier shown as a colored dot)
+2. Identifies the team-mention column from your form
+3. Runs `pnpm groups:resolve` — deterministic fuzzy name matching with union-find clustering (uses `data/team-seeds-overrides.json` for manual confirms/drops)
+4. Runs `pnpm groups:pack` — packs seeds, balances technical count, validates
+
+Produces three files in `data/`: `groups-config.json`, `team-seeds.json`, `groups.json`.
+
+UI: drag-and-drop board, per-group lock, problem chips, swap popover, halts on zero-technical teams, CSV export. Re-pack any time via the "Re-seed" button or `pnpm groups:pack` — locked groups are preserved.
 
 ## Deploying to Vercel
 
-1. Remove `data/processed.json` (and optionally `data/overrides.json`, `data/triage.json`) from `.gitignore`
-2. Commit those files to your repo
-3. Connect to Vercel and deploy
+Vercel's filesystem is read-only at runtime, so deploy as a read-only snapshot — do curation locally.
 
-**Never commit `data/list.csv`** — it contains raw emails and personal data.
+1. Force-add the snapshot you want public: `git add -f data/processed.json data/overrides.json data/triage.json` (and `data/groups-config.json data/groups.json` if using Groups)
+2. Commit and connect to Vercel
+3. **Protect access** with [Vercel Password Protection](https://vercel.com/docs/security/password-protection) or your own auth — the UI shows names, emails, and LinkedIn URLs by design
 
-Note: Vercel's filesystem is read-only at runtime, so triage / override edits made on the deployed site won't persist. Do your curation locally; deploy as a read-only snapshot.
+## PII
 
-## Security & PII
+`.gitignore` covers all of `data/` by default. **Never force-add** any of:
 
-This tool displays full candidate information (names, emails, LinkedIn URLs) by design — it's an internal ambassador tool for event curation.
-
-If you deploy publicly, **protect access**:
-
-- Use [Vercel Password Protection](https://vercel.com/docs/security/password-protection) (Pro plan)
-- Or deploy behind your own authentication
-
-The raw CSV (`data/list.csv`) is always gitignored and should never be committed.
+- `data/list.csv` — raw export
+- `data/team-seeds.json`, `data/team-seeds.draft.json`, `data/team-seeds-overrides.json` — raw name mentions
+- `data/llm-cache.json` — cached LLM responses keyed by candidate ID
 
 ## Custom Form Questions
 
-The tool automatically detects custom columns in your Luma export. Claude analyzes each custom question and decides how to render it:
-
-- Categorical data → filter chips + charts
-- Free-text responses → detail fields in triage cards
-- Yes/no questions → filters
-
-You can customize the prompt at `scripts/prompt.md`.
+Claude analyzes each custom column and renders it as filter chips, charts, detail fields, or yes/no filters. Customize via `scripts/prompt.md`.
