@@ -12,7 +12,9 @@
     "lint": "eslint",
     "process": "npx tsx scripts/process.ts",
     "process:update": "npx tsx scripts/process.ts --update",
-    "reprocess": "npx tsx scripts/process.ts --rebuild"
+    "reprocess": "npx tsx scripts/process.ts --rebuild",
+    "groups:resolve": "npx tsx scripts/groups-resolve.ts",
+    "groups:pack": "npx tsx scripts/groups-pack.ts"
   },
   "dependencies": {
     "next": "16.1.6",

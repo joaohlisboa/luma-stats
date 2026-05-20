@@ -8,17 +8,19 @@ import { ViewToggle, type View } from "./components/ViewToggle";
 import { Dashboard } from "./components/dashboard/Dashboard";
 import { Triage } from "./components/triage/Triage";
 import { Approved } from "./components/approved/Approved";
+import { Groups } from "./components/groups/Groups";
 
 function getHashView(): View {
   if (typeof window === "undefined") return "dashboard";
   const hash = window.location.hash.replace("#", "");
-  if (hash === "triage" || hash === "approved") return hash;
+  if (hash === "triage" || hash === "approved" || hash === "groups") return hash;
   return "dashboard";
 }
 
 export default function StatsPage() {
   const [rawData, setRawData] = useState<ProcessedData | null | undefined>(undefined);
   const [view, setView] = useState<View>("dashboard");
+  const [groupsEnabled, setGroupsEnabled] = useState(false);
 
   // Load data
   useEffect(() => {
@@ -29,6 +31,22 @@ export default function StatsPage() {
     } catch {
       setRawData(null);
     }
+  }, []);
+
+  // Detect whether the groups module is enabled (config + state present)
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/groups")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setGroupsEnabled(data !== null);
+      })
+      .catch(() => {
+        if (!cancelled) setGroupsEnabled(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Apply category overrides (persisted locally) to every consumer below.
@@ -98,7 +116,7 @@ export default function StatsPage() {
             <p className="text-stone-500 mt-1 text-sm">
               {[data.meta.eventDate, data.meta.eventLocation]
                 .filter(Boolean)
-                .join(" \u00B7 ")}
+                .join(" · ")}
             </p>
           )}
           <div className="mt-4">
@@ -106,6 +124,7 @@ export default function StatsPage() {
               active={view}
               onChangeView={changeView}
               counts={counts}
+              groupsEnabled={groupsEnabled}
             />
           </div>
         </div>
@@ -115,6 +134,7 @@ export default function StatsPage() {
         {view === "dashboard" && <Dashboard data={data} />}
         {view === "triage" && <Triage data={data} />}
         {view === "approved" && <Approved data={data} onSetOverride={setOverride} />}
+        {view === "groups" && <Groups data={data} />}
       </main>
 
       {/* Footer */}

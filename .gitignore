@@ -5,16 +5,18 @@ node_modules/
 .next/
 out/
 
-# data files — raw CSV always gitignored, the rest is gitignored in template
-# ambassadors: remove processed.json / overrides.json / triage.json from this
-# list to commit them for a Vercel deploy.
-data/list.csv
-data/processed.json
-data/processed-debug.json
-data/llm-cache.json
-data/overrides.json
-data/triage.json
-data/*.tmp
+# Everything in data/ is per-event and may contain PII (attendee names,
+# emails, raw form answers). Default: ignore all.
+# To deploy on Vercel, force-add the files you need, e.g.:
+#   git add -f data/processed.json data/overrides.json data/triage.json data/groups-config.json data/groups.json
+# Never force-add the following (PII):
+#   data/list.csv                  raw CSV export
+#   data/team-seeds.json           raw name mentions per cluster
+#   data/team-seeds-overrides.json raw name strings the operator confirmed/dropped
+#   data/team-seeds.draft.json     draft variant of team-seeds.json
+#   data/llm-cache.json            cached LLM responses keyed by candidate id
+data/*
+!data/.gitkeep
 
 # misc
 .DS_Store

@@ -1,22 +1,26 @@
-export type View = "dashboard" | "triage" | "approved";
+export type View = "dashboard" | "triage" | "approved" | "groups";
 
 interface ViewToggleProps {
   active: View;
   onChangeView: (v: View) => void;
   counts: { total: number; approved: number; pending: number; declined: number };
+  groupsEnabled: boolean;
 }
 
-const VIEWS: { key: View; label: string }[] = [
+const BASE_VIEWS: { key: View; label: string }[] = [
   { key: "dashboard", label: "Dashboard" },
   { key: "triage", label: "Triage" },
   { key: "approved", label: "Approved" },
 ];
 
-export function ViewToggle({ active, onChangeView, counts }: ViewToggleProps) {
+export function ViewToggle({ active, onChangeView, counts, groupsEnabled }: ViewToggleProps) {
+  const views = groupsEnabled
+    ? [...BASE_VIEWS, { key: "groups" as View, label: "Groups" }]
+    : BASE_VIEWS;
   return (
     <div className="flex items-center gap-2">
       <div className="flex rounded-lg border border-stone-200 overflow-hidden">
-        {VIEWS.map(({ key, label }) => (
+        {views.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => onChangeView(key)}
