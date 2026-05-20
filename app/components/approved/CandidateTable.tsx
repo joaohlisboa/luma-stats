@@ -276,10 +276,10 @@ export function CandidateTable({
               <th className="text-left px-4 py-3 font-medium text-stone-500 w-[180px]">
                 Name
               </th>
-              <th className="text-left px-4 py-3 font-medium text-stone-500 w-[200px]">
+              <th className="text-left px-4 py-3 font-medium text-stone-500 w-[140px]">
                 Role
               </th>
-              <th className="text-left px-4 py-3 font-medium text-stone-500 w-[200px]">
+              <th className="text-left px-4 py-3 font-medium text-stone-500 w-[140px]">
                 Company
               </th>
               {filterableFields.map((f) => (
@@ -318,7 +318,7 @@ export function CandidateTable({
                   </td>
                   <td className="px-4 py-2.5 text-stone-600 text-xs">
                     <div
-                      className="max-w-[200px] truncate"
+                      className="max-w-[140px] truncate"
                       title={roleRaw || undefined}
                     >
                       {roleRaw || "\u2014"}
@@ -326,7 +326,7 @@ export function CandidateTable({
                   </td>
                   <td className="px-4 py-2.5 text-stone-600 text-xs">
                     <div
-                      className="max-w-[200px] truncate"
+                      className="max-w-[140px] truncate"
                       title={companyRaw || undefined}
                     >
                       {companyRaw || "\u2014"}
