@@ -13,6 +13,7 @@ interface UnassignedPoolProps {
   candidatesById: Map<string, Candidate>;
   techConstraint: TechnicalConstraint;
   secondaryDot?: SecondaryDotConfig;
+  teamMentionColumn?: string | null;
   onDrop: (candidateId: string) => void;
   onMoveToGroup: (candidateId: string) => void;
 }
@@ -22,6 +23,7 @@ export function UnassignedPool({
   candidatesById,
   techConstraint,
   secondaryDot,
+  teamMentionColumn,
   onDrop,
   onMoveToGroup,
 }: UnassignedPoolProps) {
@@ -69,6 +71,7 @@ export function UnassignedPool({
                     candidate={c}
                     techConstraint={techConstraint}
                     secondaryDot={secondaryDot}
+                    teamMentionColumn={teamMentionColumn}
                     onDragStart={() => {}}
                     onClick={() => onMoveToGroup(id)}
                   />

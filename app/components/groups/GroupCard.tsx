@@ -176,6 +176,7 @@ export function GroupCard({
                 candidate={member}
                 techConstraint={config.technicalConstraint}
                 secondaryDot={config.secondaryDot}
+                teamMentionColumn={config.preExistingTeamColumn}
                 onDragStart={() => {}}
                 onClick={() => setOpenMemberId(openMemberId === id ? null : id)}
               />

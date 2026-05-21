@@ -131,21 +131,17 @@ export function Groups({ data }: GroupsProps) {
         candidatesById={candidatesById}
         techConstraint={config.technicalConstraint}
         secondaryDot={config.secondaryDot}
+        teamMentionColumn={config.preExistingTeamColumn}
         onDrop={(id) => moveMember(id, "unassigned")}
         onMoveToGroup={(id) => firstGroupId && moveMember(id, firstGroupId)}
       />
 
       <div
-        className={`grid gap-4 ${hasProblems ? "md:grid-cols-2" : "grid-cols-1"}`}
+        className={`grid gap-4 ${hasProblems ? "md:grid-cols-4" : "grid-cols-1"}`}
       >
-        {columns.map((col) => (
-          <div key={col.key} className="space-y-3">
-            {hasProblems && (
-              <h3 className="text-sm font-semibold text-stone-700 uppercase tracking-wider">
-                {col.label} <span className="text-stone-400 font-normal">({col.groups.length})</span>
-              </h3>
-            )}
-            {col.groups.length === 0 ? (
+        {columns.map((col) => {
+          const cards =
+            col.groups.length === 0 ? (
               <div className="bg-white rounded-xl border border-dashed border-stone-200 p-6 text-center text-xs text-stone-400">
                 No groups in this track yet.
               </div>
@@ -170,9 +166,30 @@ export function Groups({ data }: GroupsProps) {
                   onSetProblem={(p) => setProblem(g.id, p)}
                 />
               ))
-            )}
-          </div>
-        ))}
+            );
+
+          if (!hasProblems) {
+            return (
+              <div key={col.key} className="space-y-3">
+                {cards}
+              </div>
+            );
+          }
+
+          return (
+            <div key={col.key} className="md:col-span-2 space-y-3">
+              <h3 className="text-sm font-semibold text-stone-700 uppercase tracking-wider">
+                {col.label}{" "}
+                <span className="text-stone-400 font-normal">({col.groups.length})</span>
+              </h3>
+              {col.groups.length === 0 ? (
+                cards
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2">{cards}</div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
