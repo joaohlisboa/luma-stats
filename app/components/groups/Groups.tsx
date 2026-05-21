@@ -47,7 +47,7 @@ function exportCsv(bundle: GroupsBundle, candidatesById: Map<string, Candidate>)
 }
 
 export function Groups({ data }: GroupsProps) {
-  const { load, moveMember, swapMembers, toggleLock, setProblem, reseed } =
+  const { load, moveMember, swapMembers, toggleLock, setProblem, addGroup, reseed } =
     useGroups();
 
   const candidatesById = useMemo(
@@ -168,10 +168,22 @@ export function Groups({ data }: GroupsProps) {
               ))
             );
 
+          const addGroupKey =
+            col.key === "__none__" ? null : col.key === "all" ? null : col.key;
+          const addButton = (
+            <button
+              onClick={() => addGroup(addGroupKey)}
+              className="w-full text-xs text-stone-500 hover:text-stone-700 hover:bg-stone-50 border border-dashed border-stone-200 rounded-md py-2 transition-colors"
+            >
+              + New group
+            </button>
+          );
+
           if (!hasProblems) {
             return (
               <div key={col.key} className="space-y-3">
                 {cards}
+                {addButton}
               </div>
             );
           }
@@ -187,6 +199,7 @@ export function Groups({ data }: GroupsProps) {
               ) : (
                 <div className="grid gap-3 md:grid-cols-2">{cards}</div>
               )}
+              {addButton}
             </div>
           );
         })}

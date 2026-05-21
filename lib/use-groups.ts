@@ -144,6 +144,31 @@ export function useGroups() {
     [mutate],
   );
 
+  const addGroup = useCallback(
+    (problem: string | null) => {
+      mutate((state) => {
+        const id = `group-${Math.random().toString(36).slice(2, 10)}`;
+        const number =
+          state.groups.reduce((max, g) => Math.max(max, g.number), 0) + 1;
+        return {
+          ...state,
+          groups: [
+            ...state.groups,
+            {
+              id,
+              number,
+              problem,
+              memberIds: [],
+              locked: false,
+              seedClusterId: null,
+            },
+          ],
+        };
+      });
+    },
+    [mutate],
+  );
+
   const reseed = useCallback(async () => {
     if (load.status !== "ready") return;
     try {
@@ -160,5 +185,5 @@ export function useGroups() {
     }
   }, [load]);
 
-  return { load, moveMember, swapMembers, toggleLock, setProblem, reseed };
+  return { load, moveMember, swapMembers, toggleLock, setProblem, addGroup, reseed };
 }
