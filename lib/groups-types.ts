@@ -45,6 +45,33 @@ export interface GroupsConfig {
   problemDeclarationColumn?: string | null;
   /** Optional secondary dot rendered under each member chip's tech dot. */
   secondaryDot?: SecondaryDotConfig;
+  /** Optional extra composition rules layered on top of the tech constraint. */
+  rules?: CustomRule[];
+}
+
+/**
+ * Custom composition rule. Discriminated union by `type`. Start with
+ * `weighted-sum`; add new shapes (count-in-set, presence-of, cap-on-value) only
+ * when a real event needs them.
+ *
+ * `severity: "halt"` makes the rule mandatory — the ValidationBar surfaces a
+ * red entry and the packer best-effort biases toward satisfying it.
+ */
+export type CustomRule = WeightedSumRule;
+
+export interface WeightedSumRule {
+  id: string;
+  label: string;
+  type: "weighted-sum";
+  /** Candidate-key (camelCase) whose value is looked up in `weights`. */
+  dimensionKey: string;
+  /** Per-value weights. Unlisted values contribute 0. */
+  weights: Record<string, number>;
+  /** Group total must be >= this. Omit for no lower bound. */
+  min?: number;
+  /** Group total must be <= this. Omit for no upper bound. */
+  max?: number;
+  severity: ValidationSeverity;
 }
 
 export type SeedConfidence = "confirmed" | "high" | "medium";
@@ -91,7 +118,9 @@ export type ValidationCode =
   | "too-many-technical"
   | "all-non-technical"
   | "undersized"
-  | "missing-problem";
+  | "missing-problem"
+  | "problem-mismatch"
+  | "custom-rule";
 
 export interface ValidationEntry {
   groupId: string;

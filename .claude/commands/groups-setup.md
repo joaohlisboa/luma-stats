@@ -77,6 +77,16 @@ Ask one at a time. Default values shown in brackets.
    - "Map each value to a color." For each distinct value in the field, the user picks a color as a CSS string (hex/rgb/named). Sensible defaults to offer: red `#ef4444`, amber `#f59e0b`, green `#10b981`, slate `#64748b`. Also ask for a fallback color for unknown/null.
    → `secondaryDot: { dimensionKey, label?, values: [{ value, color, label? }], fallbackColor? }`. Skip the whole block if user said skip.
 
+7. **Custom composition rules (optional).** "Any extra rules per group? Examples: ≥ 1 Max-plan user, every group needs ≥ 4 'power points' (Max=2, Pro=1), no more than 2 students. [skip / yes]" If yes, loop:
+   - **Shape**: only `weighted-sum` is supported today. Tell the user: each member contributes a weight based on a field value; group total must satisfy a min and/or max.
+   - **Field** (`dimensionKey`): inspect `candidates[0]` keys, propose categorical ones.
+   - **Weights**: list the distinct values for that field (from `processed.json`), ask the user to assign a number to each (default 0, can skip a value). Example for plans: `{ "Max": 2, "Pro": 1 }` — values not in the map count as 0.
+   - **Threshold**: ask `min` and/or `max` (either is optional, but at least one is required).
+   - **Severity**: `halt` = mandatory (red banner, packer will best-effort try to satisfy), `warn` = best-effort, `info` = informational only.
+   - **Label**: short human-readable name for messages (e.g. "Plan coverage").
+   - Echo the rule back in plain English (e.g. "Each group must have plan-coverage score ≥ 4, where Max=2 and Pro=1. Severity: halt."), confirm, append to `rules` array. Ask "add another?"
+   → `rules: [{ id, label, type: "weighted-sum", dimensionKey, weights, min?, max?, severity }]`. Skip the whole block if user said skip; `rules` is optional in the schema.
+
 Write `data/groups-config.json` after all answers collected. Use `lib/file-store.ts`-style atomic write if you can, otherwise plain JSON.stringify with 2-space indent is fine.
 
 ### Step 3 — Confirm before resolution
